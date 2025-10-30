@@ -1,1 +1,170 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+  <meta charset="utf-8">
+  <title>Earthquake List</title>
+  <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+  <!-- MapLibre (no token needed) -->
+  <link href="https://unpkg.com/maplibre-gl@^5.9.0/dist/maplibre-gl.css" rel="stylesheet" />
+  <script src="https://unpkg.com/maplibre-gl@^5.9.0/dist/maplibre-gl.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+    }
+    #container {
+      display: flex;
+      height: 100vh;
+      flex-direction: row;
+      align-items: stretch;
+    }
+    #side-panel {
+      flex-basis: 500px;
+      overflow-y: scroll;
+      padding: 1rem;
+      background: #fff;
+      box-shadow: 2px 0 4px rgba(0,0,0,.1);
+      z-index: 1;
+    }
+    #map {
+      flex-grow: 1;
+    }
+    button {
+      margin-bottom: 10px;
+      cursor: pointer;
+    }
+    table {
+      border-collapse: collapse;
+      border-spacing: 0;
+      width: 100%;
+      border: 1px solid #ddd;
+    }
+    th, td {
+      text-align: left;
+      padding: 16px;
+    }
+    tr:nth-child(even) {
+      background-color: #f2f2f2;
+    }
+  </style>
+</head>
+<body>
+  <main id="container">
+    <div id="side-panel">
+      <h2>Earthquake List</h2>
+      <button id="sort-btn">Sort by Magnitude</button>
+      <table id="eq-table">
+        <tr>
+          <th>id</th>
+          <th>magnitude</th>
+          <th>timestamp</th>
+        </tr>
+      </table>
+    </div>
+    <div id="map"></div>
+  </main>
+
+  <script>
+    async function geojsonFetch() {
+      // 1) fetch the two files
+      let response = await fetch('assets/earthquakes.geojson');
+      const earthquakes = await response.json();
+
+      response = await fetch('assets/japan.json');
+      const japan = await response.json();
+
+      // 2) create map
+      const map = new maplibregl.Map({
+        container: 'map',
+        center: [138, 38], // japan
+        zoom: 5.5,
+        style: {
+          "version": 8,
+          "sources": {
+            "satellite": {
+              "type": "raster",
+              "tiles": ["https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2020_3857/default/g/{z}/{y}/{x}.jpg"],
+              "tileSize": 256
+            }
+          },
+          "layers": [{
+            "id": "satellite",
+            "type": "raster",
+            "source": "satellite"
+          }]
+        }
+      });
+
+      // 3) when map is ready, add layers
+      map.on('load', () => {
+        // earthquakes layer
+        map.addSource('earthquakes', {
+          type: 'geojson',
+          data: earthquakes
+        });
+        map.addLayer({
+          'id': 'earthquakes-layer',
+          'type': 'circle',
+          'source': 'earthquakes',
+          'paint': {
+            'circle-radius': 8,
+            'circle-stroke-width': 2,
+            'circle-color': 'red',
+            'circle-stroke-color': 'white'
+          }
+        });
+
+        // japan layer
+        map.addSource('japan', {
+          type: 'geojson',
+          data: japan
+        });
+        map.addLayer({
+          'id': 'japan-layer',
+          'type': 'fill',
+          'source': 'japan',
+          'paint': {
+            'fill-color': '#0080ff',
+            'fill-opacity': 0.5
+          }
+        });
+      });
+
+      // 4) build the table
+      const table = document.getElementById("eq-table");
+      for (let i = 0; i < earthquakes.features.length; i++) {
+        const f = earthquakes.features[i];
+        const row = table.insertRow(-1);
+        const c1 = row.insertCell(0);
+        const c2 = row.insertCell(1);
+        const c3 = row.insertCell(2);
+        c1.innerHTML = f.properties.id;
+        c2.innerHTML = f.properties.mag;
+        c3.innerHTML = new Date(f.properties.time).toLocaleDateString("en-US");
+      }
+
+      // 5) sorting
+      document.getElementById("sort-btn").addEventListener("click", () => {
+        let switching = true;
+        while (switching) {
+          switching = false;
+          const rows = table.rows;
+          for (let i = 1; i < rows.length - 1; i++) {
+            let shouldSwitch = false;
+            const x = parseFloat(rows[i].getElementsByTagName("td")[1].innerHTML);
+            const y = parseFloat(rows[i + 1].getElementsByTagName("td")[1].innerHTML);
+            if (x < y) {
+              rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+              switching = true;
+              break;
+            }
+          }
+        }
+      });
+    }
+
+    geojsonFetch();
+  </script>
+</body>
+</html>
 
